@@ -1,0 +1,109 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Mini Chat</title>
+  <style>
+    body {
+      max-width: 640px;
+      margin: 40px auto;
+      padding: 0 16px;
+      font-family: system-ui, sans-serif;
+    }
+    #messages {
+      height: 360px;
+      overflow-y: auto;
+      padding: 16px;
+      border: 1px solid #ddd;
+      list-style: none;
+    }
+    #messages li {
+      margin-bottom: 12px;
+      white-space: pre-wrap;
+      overflow-wrap: anywhere;
+    }
+    form { display: flex; gap: 8px; }
+    input { flex: 1; min-width: 0; padding: 10px; }
+    button { padding: 10px 16px; }
+  </style>
+</head>
+<body>
+  <h1>Mini Chat</h1>
+  <p id="status" role="status">正在连接……</p>
+
+  <ul id="messages" aria-label="聊天消息" aria-live="polite"></ul>
+
+  <form id="chat-form">
+    <input
+      id="message-input"
+      aria-label="消息内容"
+      placeholder="输入消息，按回车发送"
+      autocomplete="off"
+      disabled
+    >
+    <button id="send-button" type="submit" disabled>发送</button>
+  </form>
+
+  <script>
+    const status = document.querySelector("#status");
+    const messages = document.querySelector("#messages");
+    const form = document.querySelector("#chat-form");
+    const input = document.querySelector("#message-input");
+    const button = document.querySelector("#send-button");
+
+    function appendMessage(text) {
+      const item = document.createElement("li");
+      item.textContent = text;
+      messages.appendChild(item);
+      messages.scrollTop = messages.scrollHeight;
+    }
+
+    function setConnected(connected) {
+      input.disabled = !connected;
+      button.disabled = !connected;
+    }
+
+    // 使用页面当前的地址，适应不同主机和端口。
+    const protocol = location.protocol === "https:" ? "wss:" : "ws:";
+    const socket = new WebSocket(`${protocol}//${location.host}/ws`);
+
+    socket.addEventListener("open", () => {
+      status.textContent = "已连接";
+      setConnected(true);
+      input.focus();
+    });
+
+    socket.addEventListener("message", (event) => {
+      appendMessage(event.data);
+    });
+
+    socket.addEventListener("error", () => {
+      status.textContent = "连接发生错误";
+      setConnected(false);
+    });
+
+    socket.addEventListener("close", () => {
+      status.textContent = "连接已断开，请刷新页面重新连接";
+      setConnected(false);
+    });
+
+    form.addEventListener("submit", (event) => {
+      event.preventDefault();
+
+      const content = input.value.trim();
+      if (!content || socket.readyState !== WebSocket.OPEN) return;
+
+      // 与当前服务端的 4KB 消息限制保持一致。
+      if (new TextEncoder().encode(content).length > 4096) {
+        appendMessage("系统提示：消息不能超过 4KB，请缩短后重试。");
+        return;
+      }
+
+      socket.send(content);
+      input.value = "";
+      input.focus();
+    });
+  </script>
+</body>
+</html>

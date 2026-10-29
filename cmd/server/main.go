@@ -1,7 +1,6 @@
 package main
 
 import (
-	"fmt"
 	"log"
 	"mini-chat/internal/chat"
 	"net/http"
@@ -12,9 +11,7 @@ func main() {
 	go hub.Run()
 
 	mux := http.NewServeMux()
-	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		fmt.Fprintln(w, "mini-chat server is running!")
-	})
+	mux.Handle("/", http.FileServer(http.Dir("./web"))) // 返回首页
 	mux.HandleFunc("/ws", func(w http.ResponseWriter, r *http.Request) {
 		chat.ServeWS(hub, w, r)
 	})
