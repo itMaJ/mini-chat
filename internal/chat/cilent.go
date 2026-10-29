@@ -1,8 +1,10 @@
 package chat
 
 import (
+	"encoding/json"
 	"log"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/gorilla/websocket"
@@ -13,11 +15,12 @@ var upgrader = websocket.Upgrader{
 	WriteBufferSize: 1024,
 }
 
-// 管理单个客户端
+// 管理单个客户端，客户端中包含对应用户信息
 type Client struct {
-	hub  *Hub            // 所属的 Hub
-	conn *websocket.Conn // WebSocket 连接
-	send chan []byte     // 发送消息的 channel
+	hub      *Hub            // 所属的 Hub
+	conn     *websocket.Conn // WebSocket 连接
+	send     chan []byte     // 发送消息的 channel
+	username string          // client对应用户的相关信息
 }
 
 func ServeWS(hub *Hub, w http.ResponseWriter, r *http.Request) {
@@ -28,10 +31,13 @@ func ServeWS(hub *Hub, w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	username := strings.TrimSpace(r.URL.Query().Get("nickname"))
+
 	client := &Client{
-		hub:  hub,
-		conn: conn,
-		send: make(chan []byte, 256), // 发送消息的 channel，缓冲区大小为 256
+		hub:      hub,
+		conn:     conn,
+		send:     make(chan []byte, 256), // 发送消息的 channel，缓冲区大小为 256
+		username: username,               // 从请求中获取用户名
 	}
 
 	// 注册客户端到 Hub
@@ -62,7 +68,36 @@ func (c *Client) readPump() {
 			log.Printf("Ignoring non-text message of type %d", messageType)
 			continue
 		}
-		c.hub.broadcast <- message
+
+		// 解析 JSON，并组装成服务端消息，发送给 Hub 的广播 channel，作为字符串进行传输
+		var request ChatRequest
+		if err := json.Unmarshal(message, &request); err != nil {
+			log.Printf("Error unmarshalling message: %v", err)
+			continue
+		}
+		if request.Type != "chat" {
+			log.Printf("Unsupported message type %s", request.Type)
+			continue
+		}
+		content := strings.TrimSpace(request.Content)
+		if content == "" {
+			log.Printf("Ignoring empty chat message")
+			continue
+		}
+
+		response := ChatMessage{
+			Type:     "chat",
+			Username: c.username,
+			Content:  content,
+			SentAt:   time.Now().UTC(),
+		}
+
+		data, err := json.Marshal(response)
+		if err != nil {
+			log.Printf("Error marshalling message: %v", err)
+			continue
+		}
+		c.hub.broadcast <- data
 	}
 }
 
