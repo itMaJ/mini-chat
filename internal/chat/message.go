@@ -12,6 +12,6 @@ type ChatRequest struct {
 type ChatMessage struct {
 	Type     string    `json:"type"`
 	Content  string    `json:"content"`
-	Username string    `json:"user"` // 后续可以考虑改为整个用户信息或者用户id
+	Username string    `json:"username"` // 后续可以考虑改为整个用户信息或者用户id
 	SentAt   time.Time `json:"sent_at"`
 }

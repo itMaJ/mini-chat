@@ -31,7 +31,7 @@ func ServeWS(hub *Hub, w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	username := strings.TrimSpace(r.URL.Query().Get("nickname"))
+	username := strings.TrimSpace(r.URL.Query().Get("username"))
 
 	client := &Client{
 		hub:      hub,
